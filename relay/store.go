@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
@@ -38,12 +39,13 @@ func (s *MemoryStore) Claim(route Route) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireLocked(time.Now())
-	if _, ok := s.routes[route.Locator]; ok || s.instances[route.InstanceID] != "" {
+	locator := strings.ToLower(route.Locator)
+	if _, ok := s.routes[locator]; ok || s.instances[route.InstanceID] != "" {
 		return ErrDuplicateChannel
 	}
-	s.routes[route.Locator] = route
+	s.routes[locator] = route
 	s.instances[route.InstanceID] = route.ConnectionID
-	s.known[route.Locator] = true
+	s.known[locator] = true
 	return nil
 }
 
@@ -51,6 +53,7 @@ func (s *MemoryStore) Resolve(locator string, now time.Time) (Route, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireLocked(now)
+	locator = strings.ToLower(locator)
 	route, ok := s.routes[locator]
 	if ok {
 		return route, nil

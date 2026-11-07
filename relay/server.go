@@ -150,6 +150,7 @@ func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
 		s.error(conn, "stream_rejected", true)
 		return
 	}
+	d.markReady(open.StreamID)
 	if !writeJSON(conn, map[string]any{"type": "stream_ready", "version": 1, "stream_id": open.StreamID}, s.config.WriteTimeout) {
 		return
 	}
@@ -183,7 +184,7 @@ type desktop struct {
 type stream struct {
 	mobile   *websocket.Conn
 	accepted chan bool
-	buffered int64
+	ready    bool
 }
 
 func (d *desktop) readLoop() {
@@ -251,14 +252,24 @@ func (d *desktop) control(value any) bool {
 	return writeJSON(d.conn, value, d.server.config.WriteTimeout)
 }
 func (d *desktop) toMobile(id uint32, bytes []byte) bool {
-	st := d.get(id)
-	if st == nil {
+	d.mu.Lock()
+	st := d.streams[id]
+	ready := st != nil && st.ready
+	d.mu.Unlock()
+	if !ready {
 		return false
 	}
 	if int64(len(bytes)) > d.server.config.MaxBufferedBytes || !writeBinary(st.mobile, bytes, d.server.config.WriteTimeout) {
 		return false
 	}
 	return true
+}
+func (d *desktop) markReady(id uint32) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if st := d.streams[id]; st != nil {
+		st.ready = true
+	}
 }
 func (d *desktop) toDesktop(id uint32, bytes []byte) bool {
 	if d.get(id) == nil || int64(len(bytes)) > d.server.config.MaxBufferedBytes {
