@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "scenario": "unknown_locator",
+  "mobile_open": {
+    "locator": "UNKNOWN"
+  },
+  "expected": {
+    "error": "unknown_locator",
+    "retryable": true,
+    "stream_created": false
+  }
+}

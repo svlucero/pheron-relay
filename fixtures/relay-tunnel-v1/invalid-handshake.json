@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "scenario": "invalid_handshake",
+  "desktop_hello": {
+    "type": "desktop_hello",
+    "version": 2
+  },
+  "expected": {
+    "error": "unsupported_version",
+    "retryable": false,
+    "routing_entry_created": false
+  }
+}
