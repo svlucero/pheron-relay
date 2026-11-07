@@ -12,5 +12,9 @@
   desktop `/api/*`, `/ws`, or `/api/session-token`.
 - Pheron App pairing material supplies the relay URL, locator, and pinned
   Agentflow gateway SPKI. See pheron-app#12 and agentflow#422.
+- The Go `relay.Server` implements those two WebSocket routes. Callers must
+  supply a `TicketAuthenticator` and shared `Store`; malformed/authentication
+  failures and expired/duplicate routes return protocol error controls without
+  logging or interpreting opaque TLS payloads.
 
 See [architecture](architecture.md) for component ownership.

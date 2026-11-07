@@ -1,5 +1,10 @@
 # Coding standards
 
+- Go code is formatted with `gofmt`; run `go test ./...` and `go vet ./...`
+  (use `env -u GOROOT` when the shell has a stale toolchain override).
+- Keep data-plane dependencies injected: implementations of `TicketAuthenticator`
+  validate tickets/key proofs and implementations of `Store` provide atomic
+  multi-replica routing. Do not add credentials or a local-only production store.
 - Write concise Markdown contracts and ADRs; use JSON for deterministic,
   non-secret fixture scenarios.
 - Version every wire message and use stable machine-readable error codes;
