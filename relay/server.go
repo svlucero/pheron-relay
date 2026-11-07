@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -22,12 +24,17 @@ const (
 )
 
 type Server struct {
-	config   Config
-	store    Store
-	auth     TicketAuthenticator
-	upgrader websocket.Upgrader
-	mu       sync.Mutex
-	desktops map[string]*desktop
+	config          Config
+	store           Store
+	auth            TicketAuthenticator
+	upgrader        websocket.Upgrader
+	mu              sync.Mutex
+	desktops        map[string]*desktop
+	limiter         *rateLimiter
+	metrics         *metrics
+	draining        atomic.Bool
+	desktopChannels atomic.Int64
+	mobileStreams   atomic.Int64
 }
 
 func NewServer(config Config, store Store, auth TicketAuthenticator) *Server {
@@ -53,7 +60,32 @@ func NewServer(config Config, store Store, auth TicketAuthenticator) *Server {
 	if config.WriteTimeout == 0 {
 		config.WriteTimeout = defaults.WriteTimeout
 	}
-	return &Server{config: config, store: store, auth: auth, desktops: map[string]*desktop{}, upgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}}
+	if config.MaxDesktopChannels == 0 {
+		config.MaxDesktopChannels = defaults.MaxDesktopChannels
+	}
+	if config.MaxDesktopAttemptsPerMinute == 0 {
+		config.MaxDesktopAttemptsPerMinute = defaults.MaxDesktopAttemptsPerMinute
+	}
+	if config.MaxMobileOpensPerMinute == 0 {
+		config.MaxMobileOpensPerMinute = defaults.MaxMobileOpensPerMinute
+	}
+	if config.MaxSourceOpensPerMinute == 0 {
+		config.MaxSourceOpensPerMinute = defaults.MaxSourceOpensPerMinute
+	}
+	if config.RateLimitWindow == 0 {
+		config.RateLimitWindow = defaults.RateLimitWindow
+	}
+	return &Server{config: config, store: store, auth: auth, desktops: map[string]*desktop{}, limiter: newRateLimiter(), metrics: newMetrics(), upgrader: websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}}
+}
+
+// Drain stops new channel and stream admission while allowing established
+// streams to finish until the hosting process reaches its drain deadline.
+func (s *Server) Drain() { s.draining.Store(true) }
+
+func (s *Server) Draining() bool { return s.draining.Load() }
+
+func (s *Server) Metrics() MetricsSnapshot {
+	return MetricsSnapshot{DesktopChannels: s.desktopChannels.Load(), MobileStreams: s.mobileStreams.Load(), Draining: s.Draining(), Events: s.metrics.snapshot()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -64,6 +96,10 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) handleDesktop(w http.ResponseWriter, r *http.Request) {
+	if s.Draining() {
+		http.Error(w, "relay unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -88,9 +124,14 @@ func (s *Server) handleDesktop(w http.ResponseWriter, r *http.Request) {
 		s.error(conn, "registration_invalid", false)
 		return
 	}
+	if !s.allowDesktop(hello.InstanceID, r.RemoteAddr) || !s.reserveDesktop() {
+		s.error(conn, "rate_limited", true)
+		return
+	}
 	connectionID := randomID()
 	route := Route{InstanceID: hello.InstanceID, Locator: hello.Locator, ConnectionID: connectionID, ExpiresAt: time.Now().Add(s.config.Lease)}
 	if err := s.store.Claim(route); err != nil {
+		s.desktopChannels.Add(-1)
 		s.error(conn, codeFor(err), false)
 		return
 	}
@@ -98,6 +139,7 @@ func (s *Server) handleDesktop(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.desktops[connectionID] = d
 	s.mu.Unlock()
+	s.metrics.add("desktop_ready")
 	defer s.removeDesktop(d)
 	if !d.control(map[string]any{"type": "desktop_ready", "version": 1, "lease_seconds": int(s.config.Lease.Seconds()), "connection_id": connectionID}) {
 		return
@@ -107,6 +149,10 @@ func (s *Server) handleDesktop(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
+	if s.Draining() {
+		http.Error(w, "relay unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
@@ -123,6 +169,10 @@ func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
 		s.error(conn, "invalid_handshake", false)
 		return
 	}
+	if !s.allowMobile(open.Locator, r.RemoteAddr) {
+		s.error(conn, "rate_limited", true)
+		return
+	}
 	route, err := s.store.Resolve(open.Locator, time.Now())
 	if err != nil {
 		s.error(conn, codeFor(err), true)
@@ -135,8 +185,10 @@ func (s *Server) handleMobile(w http.ResponseWriter, r *http.Request) {
 		s.error(conn, "stream_limit", true)
 		return
 	}
+	s.mobileStreams.Add(1)
+	s.metrics.add("stream_open")
 	stream := d.get(open.StreamID)
-	defer d.closeStream(open.StreamID, true)
+	defer func() { s.mobileStreams.Add(-1); d.closeStream(open.StreamID, true) }()
 	if !d.control(map[string]any{"type": "stream_open", "version": 1, "stream_id": open.StreamID}) {
 		return
 	}
@@ -311,11 +363,46 @@ func (s *Server) removeDesktop(d *desktop) {
 	s.mu.Lock()
 	delete(s.desktops, d.route.ConnectionID)
 	s.mu.Unlock()
+	s.desktopChannels.Add(-1)
+	s.metrics.add("desktop_closed")
 	d.closeAll()
 }
 func (s *Server) error(conn *websocket.Conn, code string, retryable bool) {
+	s.metrics.add("error_" + code)
 	_ = writeJSON(conn, map[string]any{"type": "error", "version": 1, "code": code, "retryable": retryable}, s.config.WriteTimeout)
 	_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, code), time.Now().Add(s.config.WriteTimeout))
+}
+
+func (s *Server) allowDesktop(instanceID, remote string) bool {
+	now := time.Now()
+	return s.limiter.allow("desktop-instance", instanceID, s.config.MaxDesktopAttemptsPerMinute, s.config.RateLimitWindow, now) &&
+		s.limiter.allow("desktop-source", sourceIP(remote), s.config.MaxSourceOpensPerMinute, s.config.RateLimitWindow, now)
+}
+
+func (s *Server) reserveDesktop() bool {
+	for {
+		current := s.desktopChannels.Load()
+		if current >= int64(s.config.MaxDesktopChannels) {
+			return false
+		}
+		if s.desktopChannels.CompareAndSwap(current, current+1) {
+			return true
+		}
+	}
+}
+
+func (s *Server) allowMobile(locator, remote string) bool {
+	now := time.Now()
+	return s.limiter.allow("mobile-locator", locator, s.config.MaxMobileOpensPerMinute, s.config.RateLimitWindow, now) &&
+		s.limiter.allow("mobile-source", sourceIP(remote), s.config.MaxSourceOpensPerMinute, s.config.RateLimitWindow, now)
+}
+
+func sourceIP(remote string) string {
+	host, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		return remote
+	}
+	return host
 }
 func codeFor(err error) string {
 	switch {
