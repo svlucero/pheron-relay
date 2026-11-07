@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "scenario": "disconnect",
+  "open_stream": {
+    "locator": "P7K3M",
+    "stream_id": 17,
+    "inner_tls_bytes": "<not captured>"
+  },
+  "event": "desktop_outer_socket_closed",
+  "expected": {
+    "mobile_action": "RST",
+    "routing_entry_removed": true,
+    "payload_logged": false,
+    "mobile_reconnect_requires_new_stream": true
+  }
+}

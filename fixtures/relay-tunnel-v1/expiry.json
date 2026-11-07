@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "scenario": "expiry",
+  "desktop_channel": {
+    "locator": "P7K3M",
+    "lease_seconds": 45,
+    "last_valid_activity_seconds_ago": 46
+  },
+  "expected": {
+    "routing_entry_removed": true,
+    "active_stream_action": "RST",
+    "mobile_error": "instance_offline"
+  }
+}
