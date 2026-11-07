@@ -1,8 +1,11 @@
 # Relay tunnel protocol v1
 
 Status: normative design contract. This contract is implemented by the relay
-and the Agentflow integration tracked in [agentflow#422]. It carries the mobile
-gateway described by [pheron-app#12] without changing that API.
+and the Agentflow integration tracked in
+[agentflow#422](https://github.com/svlucero/agentflow/issues/422). It carries
+the mobile gateway described by
+[pheron-app#12](https://github.com/svlucero/pheron-app/pull/12) without
+changing that API.
 
 ## Scope and trust boundary
 
@@ -182,5 +185,7 @@ availability, routing-store availability, and data-plane admission. Alert on
 lease loss, reconnect storms, quota resets, and routing-store errors without
 capturing sensitive content.
 
-The integration dependency is [agentflow#422]; the client pairing and mobile
-API dependency is [pheron-app#12].
+The integration dependency is
+[agentflow#422](https://github.com/svlucero/agentflow/issues/422); the client
+pairing and mobile API dependency is
+[pheron-app#12](https://github.com/svlucero/pheron-app/pull/12).

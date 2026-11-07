@@ -3,7 +3,8 @@
 - Status: accepted
 - Date: 2026-11-07
 - Relates to: [relay tunnel v1](../contracts/relay-tunnel-v1.md),
-  [pheron-app#12], and [agentflow#422]
+  [pheron-app#12](https://github.com/svlucero/pheron-app/pull/12), and
+  [agentflow#422](https://github.com/svlucero/agentflow/issues/422)
 
 ## Context
 
