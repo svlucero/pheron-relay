@@ -22,4 +22,12 @@ python3 scripts/validate_fixtures.py
 env -u GOROOT go test ./...
 env -u GOROOT go vet ./...
 ```
-# pheron-relay
+
+## Local staging-style run
+
+This repository can run a **development-only** relay container for an end to
+end socket check. Copy `.env.example` to `.env`, place a locally generated TLS
+certificate and key at `.local/tls/relay.pem` and `.local/tls/relay-key.pem`,
+then run `docker compose -f compose.staging.yaml up --build`. The supplied
+authenticator and routing store intentionally refuse production use. See the
+[staging guide](docs/operations/staging.md) and [operations runbook](docs/operations/runbook.md).

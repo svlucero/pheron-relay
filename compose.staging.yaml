@@ -1,0 +1,18 @@
+services:
+  relay:
+    build: .
+    env_file: .env
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./.local/tls:/run/relay/tls:ro
+    environment:
+      RELAY_TLS_CERT_FILE: /run/relay/tls/relay.pem
+      RELAY_TLS_KEY_FILE: /run/relay/tls/relay-key.pem
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

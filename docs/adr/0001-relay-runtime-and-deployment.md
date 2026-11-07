@@ -47,6 +47,12 @@ The evidence above is from Vercel's current WebSocket knowledge base and
 
 - The relay implementation must use a pluggable routing/lease store and not
   depend on connection affinity.
+- A routing store alone cannot move a live WebSocket between processes. Until a
+  cross-replica stream-forwarding transport is implemented, the edge must send
+  desktop and matching mobile connections to the active route owner (or return
+  the documented retryable unavailable outcome). A deployment must prove this
+  ownership routing during scale and failover tests; it must never fall back to
+  another instance's channel.
 - A chosen serverless deployment must force planned reconnect before its maximum
   lifetime and demonstrate no routing split-brain during scale/deploy.
 - A long-running service must budget health checks, autoscaling, patching, and

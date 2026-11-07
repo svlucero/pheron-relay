@@ -17,5 +17,14 @@
 - Python validators use only the standard library and run from repository root
   with `python3 scripts/validate_docs.py` and `python3 scripts/validate_fixtures.py`.
 - Use Conventional Commits, with focused `docs:` and `test:` commits.
+- Runtime configuration comes from `RELAY_*` environment variables; examples
+  contain names and safe development values only. Secret paths may be supplied
+  at runtime, but values must never be logged, emitted as metrics labels, or
+  committed.
+- Operational metrics use bounded, aggregate event names only. Health and
+  readiness responses contain only status; do not add routing or authentication
+  diagnostics to them.
+- Exercise socket changes with `go test -race ./...`; keep concurrency,
+  disconnect, quota, and tenant-isolation coverage local and deterministic.
 
 See [architecture](architecture.md) for boundaries.

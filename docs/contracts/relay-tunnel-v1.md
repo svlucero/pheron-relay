@@ -178,7 +178,11 @@ or Agentflow authorization state.
 
 Run at least two relay replicas across failure domains. Replicas require a
 strongly consistent or atomic shared routing/lease store and distributed rate
-limits; a node-local map alone is insufficient. Drain deployments by refusing
+limits; a node-local map alone is insufficient. A routing store records route
+ownership but cannot transfer a live WebSocket: until an inter-replica stream
+transport exists, the edge must route both sides of a locator to its active
+owner. If that owner is unavailable, the client reconnects; a replica must
+never attach the stream to any other desktop channel. Drain deployments by refusing
 new opens, giving ready desktops a reconnect signal, and allowing existing
 streams up to 30 seconds before reset. Health checks distinguish control-plane
 availability, routing-store availability, and data-plane admission. Alert on

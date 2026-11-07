@@ -16,5 +16,13 @@
   supply a `TicketAuthenticator` and shared `Store`; malformed/authentication
   failures and expired/duplicate routes return protocol error controls without
   logging or interpreting opaque TLS payloads.
+- The executable also serves `GET /healthz` (process liveness), `GET /readyz`
+  (503 while draining), and `GET /metrics` (aggregate gauges/counters only).
+  These operational routes expose no route identifiers, request content, or
+  credentials and must be access-controlled by deployment infrastructure.
+- `Server.Drain()` rejects new desktop/mobile admissions but permits established
+  streams to finish until the host shutdown deadline. New admission is subject
+  to bounded global, per-instance/locator, and source limits; rate keys are
+  hashed locally and are not exposed in metrics.
 
 See [architecture](architecture.md) for component ownership.
