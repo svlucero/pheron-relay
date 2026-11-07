@@ -19,6 +19,18 @@
 - `docs/contracts/relay-tunnel-v1.md` is normative; `docs/adr/` records runtime
   decisions. `fixtures/relay-tunnel-v1/` is validated by standard-library
   Python scripts in `scripts/`; `relay/server_test.go` covers socket behavior.
+- `cmd/relay/` is a development-only executable with TLS, process health,
+  readiness, aggregate metrics, and signal-driven drain. It intentionally
+  rejects non-development operation until a real ticket authenticator and
+  shared routing implementation are supplied by the operator.
+- `Dockerfile`, `compose.staging.yaml`, and `.env.example` provide a local
+  staging-style container run with mounted local TLS material. `docs/operations/`
+  records production prerequisites, owner-aware multi-replica routing, alerts,
+  limits, recovery, and rollback; it does not claim a hosted staging service.
+- `Server` exposes aggregate secret-free metrics and local admission/drain
+  controls. A shared route record cannot transfer a live WebSocket between
+  replicas: owner-aware edge routing or inter-replica forwarding remains a
+  deployment requirement.
 - Agentflow#422 implements the gateway/tunnel integration; pheron-app#12 owns
   pairing material and the mobile client contract.
 
