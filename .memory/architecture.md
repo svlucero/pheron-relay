@@ -33,5 +33,10 @@
   deployment requirement.
 - Agentflow#422 implements the gateway/tunnel integration; pheron-app#12 owns
   pairing material and the mobile client contract.
+- Vercel Functions support WebSockets as of 2026-10-20, but each live socket
+  remains attached to one function instance. Vercel hosting therefore still
+  needs external atomic route state plus owner-aware routing or inter-instance
+  forwarding; the current standalone Go server must be adapted and validated
+  as a Vercel function before deploying there.
 
 See [API contracts](api_contracts.md) and [coding standards](coding_standards.md).

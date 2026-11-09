@@ -26,5 +26,8 @@
   diagnostics to them.
 - Exercise socket changes with `go test -race ./...`; keep concurrency,
   disconnect, quota, and tenant-isolation coverage local and deterministic.
+- For Vercel deployments, validate the Go handler lifecycle, function duration,
+  WebSocket reconnects, and cross-instance forwarding; do not assume a Docker
+  container or process-local routing map is a deployable Vercel function.
 
 See [architecture](architecture.md) for boundaries.

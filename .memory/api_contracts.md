@@ -24,5 +24,9 @@
   streams to finish until the host shutdown deadline. New admission is subject
   to bounded global, per-instance/locator, and source limits; rate keys are
   hashed locally and are not exposed in metrics.
+- A hosted Vercel domain supplies the outer HTTPS/WSS certificate after DNS
+  validation; it does not replace the Agentflow gateway SPKI pin used for the
+  separate inner mobile TLS connection. Registration tickets and mobile device
+  credentials remain distinct and must never be substituted for one another.
 
 See [architecture](architecture.md) for component ownership.
